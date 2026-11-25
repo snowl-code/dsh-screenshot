@@ -23,8 +23,8 @@ plugin_manager(install_bundle, "link:/absolute/path/to/dsh-screenshot")
 ## 使用
 
 1. 点输入框左下角的相机按钮。
-2. 屏幕变十字准星，拖拽框选区域（macOS 可再按空格切换窗口选择；`Esc` 取消）。
-3. 松开后约 1 秒，截图以缩略图出现在输入框上方的附件栏。
+2. 屏幕定格成十字准星，拖拽框选区域（拖拽时选区上方实时显示 `宽 × 高`；macOS 可再按空格切换窗口选择；`Esc` 或右键取消）。
+3. 松开后即刻出图（Windows 实测约 0.1 秒），截图以缩略图出现在输入框上方的附件栏。
 4. 正常输入问题并发送，图片随消息一起送达。
 
 ### 快捷键
@@ -57,13 +57,28 @@ plugin_manager(install_bundle, "link:/absolute/path/to/dsh-screenshot")
 
 截图区域长边会被压到 1800px、JPEG 质量 82（原图更大时再压到 1280px），避免撑爆上下文（1280px 回落仅 macOS 使用）。
 
+### 响应速度（Windows）
+
+Windows 侧的框选与截图默认跑在一个**常驻 PowerShell 代理**里（`bin/win/capture-agent.ps1`），而不是每次点按钮都新起一个进程。原因很直接：一句 `powershell.exe -File xxx.ps1` 光启动就要 1.1–1.6 秒（要加载 .NET 与 WinForms），而热起来之后抓一次 2560×1440 全屏只要 50 毫秒。
+
+实测（Windows 11，2560×1440 单屏，`lib/index.js` 同一时钟）：
+
+| 阶段 | 耗时 |
+| --- | --- |
+| 代理首次启动并预热（只在插件启动后发生一次） | 约 1.9 秒 |
+| 按下快捷键 → 选框出现（热） | **63 毫秒** |
+| 松开鼠标 → 图片回到页面（热） | **113 毫秒** |
+| 同上两项（冷，代理没起来时走一次性脚本兜底） | 约 2.1 秒 |
+
+代理在页面挂载、同步全局热键的那一刻就预热（不等到你第一次点按钮），所以第一次按 `Ctrl+Alt+S` 也是热的。空闲 30 分钟没有截图会自动退出，把约 45MB 内存还回去；之后再截图会冷启动一次。代理起不来时自动退回一次性 `capture.ps1`，功能不受影响。
+
 ## 系统要求
 
 - **macOS**：截屏走系统 `screencapture -i`，需要在「系统设置 → 隐私与安全性 → 屏幕录制」里给 DSH Desktop 授权；未授权时按钮会提示「需要屏幕录制权限」。全局热键的辅助程序需要 `bin/dsh-hotkey` 与当前 Mac 架构匹配，换机器或换架构后用 `helper/build.sh` 重新编译。
-- **Windows 10/11**：框选与全局热键都由系统自带的 Windows PowerShell 5.1 执行（`bin/win/capture.ps1` / `bin/win/hotkey.ps1`），不需要安装额外工具，也没有屏幕录制授权步骤。PowerShell 被策略禁用或路径异常时，按钮会提示启动失败，应用内快捷键仍然可用。
+- **Windows 10/11**：框选与全局热键都由系统自带的 Windows PowerShell 5.1 执行（`bin/win/capture.ps1` / `bin/win/capture-agent.ps1` / `bin/win/hotkey.ps1`），不需要安装额外工具，也没有屏幕录制授权步骤。PowerShell 被策略禁用或路径异常时，按钮会提示启动失败，应用内快捷键仍然可用。
 - 全局热键只有在 DSH Desktop 运行期间可用（辅助程序是它的子进程）。
 - 其它平台会返回 `unsupported-platform`（按钮提示不支持）。
-- 测试状态：macOS 分支已在真机验证；Windows 分支按 Windows 10/11 自带 PowerShell 5.1 编写，尚未在真机回归，遇到问题请开 issue。
+- 测试状态：macOS 分支已在真机验证；Windows 分支已在 Windows 11 + 自带 PowerShell 5.1 真机回归（含多屏虚拟桌面坐标、DPI 缩放、热键与常驻代理）。
 
 ## 实现结构
 
@@ -73,7 +88,9 @@ plugin_manager(install_bundle, "link:/absolute/path/to/dsh-screenshot")
 | `lib/client.js` | 浏览器侧：注册 `conversation.input.left` 槽位按钮与 `dsh-screenshot.capture` 快捷键命令，拿到图片后走官方草稿附件 API；同步键位、轮询全局截图 |
 | `helper/hotkey.swift` | 全局热键辅助程序源码（Carbon `RegisterEventHotKey` + `NSApplication` 事件循环 + 前后台切换时让键；裸 `RunLoop` 收不到 Carbon 热键事件） |
 | `bin/dsh-hotkey` | macOS 辅助程序，由 `helper/build.sh` 生成，随包发布 |
-| `bin/win/capture.ps1` | Windows 框选截图（全屏半透明遮罩 + `CopyFromScreen` + JPEG 缩放） |
+| `bin/win/capture.ps1` | Windows 一次性框选截图（冻结快照 + 框选 + JPEG 缩放），代理起不来时的兜底路径 |
+| `bin/win/capture-agent.ps1` | Windows 常驻截图代理：启动时预热 WinForms 与截图链路，之后按 stdin 上的 `CAPTURE/DONE/CANCEL/ERR/PING/EXIT` 协议逐张出图 |
+| `bin/win/overlay.ps1` | 两个 Windows 入口共用：抓整屏快照、在快照上框选（双缓冲 + 脏矩形重绘 + `宽 × 高` 尺寸标签）、裁剪缩放存 JPEG |
 | `bin/win/hotkey.ps1` | Windows 全局热键（内嵌 C# `RegisterHotKey` + 消息循环 + 前后台切换时让键） |
 | `cordis.patch.yml` | bundle 插件条目（`insert: dsh-screenshot`） |
 
@@ -92,7 +109,7 @@ Header: x-dsh-screenshot: 1        (缺失 → 403，用于挡跨站请求)
 GET  /dsh-screenshot-capture/pending  → { ok: true, items: [{ id, dataUrl, mime, name, at }] }
 POST /dsh-screenshot-capture/take     ← { id }          页面确认已入草稿
 POST /dsh-screenshot-capture/hotkey   ← { code, modifiers } 或 { keycode, mods }（旧版）或 { enabled: false }
-GET  /dsh-screenshot-capture/status   → { ok, platform, supported, active, lastTriggerAt, pending, helperKey, helperKind, helperLog }
+GET  /dsh-screenshot-capture/status   → { ok, platform, supported, active, lastTriggerAt, pending, helperKey, helperKind, helperLog, agent: { pid, warm, inflight } | null }
 ```
 
 非 POST（capture/take/hotkey）回 405，其它路径回 404。截图请求经 `enqueue()` 串行化，同时只允许一次框选；全局热键的截图最多在宿主队列里滞留 3 张，页面取走前一直保留。
@@ -119,7 +136,7 @@ if (shell.addFiles([], drafts.map(d => d.id)) !== true) {
 - 宿主 smoke（仅 macOS）：`npm run test:host` —— 起假的宿主 ctx，验证路由、参数校验、辅助程序拉起/停止和截图队列。
 - 重新编译全局热键辅助程序：`./helper/build.sh`（需要 Xcode Command Line Tools，`swiftc` 6.1+）。
 
-**改完怎么生效**：客户端 bundle 由宿主在启动时构建并缓存在内存里，所以改了 `lib/client.js` 必须升级版本号 → `remove_bundle` + `install_bundle` → 完全退出并重开 DSH Desktop 才生效（`remove_bundle` 本身也是延迟到重启才真正移除）。
+**改完怎么生效**：客户端 bundle 由宿主在启动时构建并缓存在内存里，所以改了 `lib/client.js` 必须升级版本号 → `remove_bundle` + `install_bundle` → 完全退出并重开 DSH Desktop 才生效（`remove_bundle` 本身也是延迟到重启才真正移除）。只改 `lib/index.js` 或 `bin/win/*.ps1` 时不需要重装，**退出并重开一次 DSH Desktop** 即可（宿主 JS 在启动时加载，`.ps1` 每次 spawn 时现读）；重开后 `GET /dsh-screenshot-capture/status` 里能看到 `agent` 字段就说明新版宿主已生效。
 
 ## License
 

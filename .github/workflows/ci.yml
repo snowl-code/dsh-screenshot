@@ -33,5 +33,12 @@ jobs:
         run: |
           powershell -NoProfile -ExecutionPolicy Bypass -File bin/win/hotkey.ps1 -Vk 83 -Mods 3 -Check
           powershell -NoProfile -ExecutionPolicy Bypass -File bin/win/capture.ps1 -Out "$env:TEMP\probe.jpg" -Check
+      - name: Warm capture agent reaches READY
+        shell: powershell
+        run: |
+          $output = '' | powershell -NoProfile -ExecutionPolicy Bypass -STA -File bin/win/capture-agent.ps1
+          $output | Write-Output
+          if ($LASTEXITCODE -ne 0) { throw "capture-agent exited with $LASTEXITCODE" }
+          if (-not ($output -match 'READY')) { throw 'capture-agent did not report READY' }
       - name: Smoke test on Windows
         run: npm test
