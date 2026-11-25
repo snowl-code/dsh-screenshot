@@ -134,7 +134,7 @@ assert.equal(command.defaults['web:linux'], undefined)
 
 const hotkeyCall = calls.fetch.find((entry) => entry.url.includes('/hotkey'))
 assert.ok(hotkeyCall, '应把当前键位同步给宿主的全局热键')
-assert.deepEqual(JSON.parse(hotkeyCall.body), { keycode: 1, mods: 2304 })
+assert.deepEqual(JSON.parse(hotkeyCall.body), { code: 'KeyS', modifiers: ['alt', 'meta'] })
 
 const slots = calls.slots.map((entry) => entry.id + '#' + entry.name)
 assert.ok(slots.includes('dsh-screenshot#conversation.input.left'), '应挂到 conversation.input.left 槽位')

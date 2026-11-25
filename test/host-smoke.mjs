@@ -70,13 +70,15 @@ const statusBefore = await call({ method: 'GET', url: '/dsh-screenshot-capture/s
 assert.equal(statusBefore.payload.ok, true)
 assert.equal(statusBefore.payload.active, false)
 
+// 旧版页面发来的 macOS 键码 + Carbon 掩码仍要能识别（0.2.x 页面在重启前还会这么发）
 const enable = await call({ method: 'POST', url: '/dsh-screenshot-capture/hotkey', headers, body: JSON.stringify({ keycode: 1, mods: 2304 }) })
 assert.equal(enable.payload.active, true)
+assert.equal(enable.payload.helperKind, 'swift')
 await new Promise((resolve) => setTimeout(resolve, 400))
 
 const statusOn = await call({ method: 'GET', url: '/dsh-screenshot-capture/status' })
 assert.equal(statusOn.payload.active, true)
-assert.equal(statusOn.payload.helperKey, '1:2304')
+assert.equal(statusOn.payload.helperKey, 'swift:{"code":"KeyS","modifiers":["primary","alt"]}')
 assert.ok(Array.isArray(statusOn.payload.helperLog) && statusOn.payload.helperLog.length > 0, '应记录辅助程序日志')
 
 const pending = await call({ method: 'GET', url: '/dsh-screenshot-capture/pending' })
@@ -84,6 +86,13 @@ assert.deepEqual(pending.payload.items, [])
 
 const bad = await call({ method: 'POST', url: '/dsh-screenshot-capture/hotkey', headers, body: JSON.stringify({ keycode: 'x' }) })
 assert.equal(bad.status, 400)
+
+// 抽象形态（新版页面）也接受；macOS 映射不到的键回 400
+const abstract = await call({ method: 'POST', url: '/dsh-screenshot-capture/hotkey', headers, body: JSON.stringify({ code: 'KeyS', modifiers: ['primary', 'alt'] }) })
+assert.equal(abstract.payload.active, true)
+const unmapped = await call({ method: 'POST', url: '/dsh-screenshot-capture/hotkey', headers, body: JSON.stringify({ code: 'F13', modifiers: ['primary'] }) })
+assert.equal(unmapped.payload.ok, false)
+assert.equal(unmapped.payload.code, 'unsupported-key')
 
 const disable = await call({ method: 'POST', url: '/dsh-screenshot-capture/hotkey', headers, body: JSON.stringify({ enabled: false }) })
 assert.equal(disable.payload.active, false)

@@ -17,5 +17,21 @@ jobs:
           node --check lib/index.js
           node --check lib/client.js
           node --check test/client-smoke.mjs
-      - name: Smoke test (client, no DSH required)
+          node --check test/keycodes-smoke.mjs
+      - name: Smoke test (client + key mapping, no DSH required)
+        run: npm test
+
+  windows-scripts:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Compile-check Windows helpers (Windows PowerShell 5.1)
+        shell: powershell
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File bin/win/hotkey.ps1 -Vk 83 -Mods 3 -Check
+          powershell -NoProfile -ExecutionPolicy Bypass -File bin/win/capture.ps1 -Out "$env:TEMP\probe.jpg" -Check
+      - name: Smoke test on Windows
         run: npm test
