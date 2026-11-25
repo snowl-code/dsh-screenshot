@@ -1,0 +1,12 @@
+# macOS
+.DS_Store
+
+# 依赖 / 打包产物
+node_modules/
+*.tgz
+
+# 日志
+*.log
+
+# 本地安装快照（DSH 安装时拷贝出来的 source/ 目录）
+source/
