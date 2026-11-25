@@ -33,7 +33,7 @@ plugin_manager(install_bundle, "link:/absolute/path/to/dsh-screenshot")
 
 | 运行环境 | 默认键位 |
 | --- | --- |
-| DSH Desktop（macOS / Windows / Linux） | `⌘⌥S` / `Ctrl+Alt+S` |
+| DSH Desktop（macOS / Windows） | `⌘⌥S` / `Ctrl+Alt+S` |
 | 浏览器（macOS / Windows） | `⌘⌥S` / `Ctrl+Alt+S` |
 | 浏览器（Linux） | 默认不绑定 |
 
@@ -55,7 +55,7 @@ plugin_manager(install_bundle, "link:/absolute/path/to/dsh-screenshot")
 
 辅助程序只在 DSH 运行期间存在，随 DSH 退出而退出，不需要 LaunchAgent 或登录项。它不碰屏幕内容——截图仍然由 DSH 进程执行；辅助程序只负责「把热键按下的消息告诉宿主」。
 
-截图区域长边会被压到 1800px、JPEG 质量 82（原图更大时再压到 1280px），避免撑爆上下文。
+截图区域长边会被压到 1800px、JPEG 质量 82（原图更大时再压到 1280px），避免撑爆上下文（1280px 回落仅 macOS 使用）。
 
 ## 系统要求
 
