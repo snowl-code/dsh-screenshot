@@ -1,13 +1,13 @@
 # dsh-screenshot
 
-[![CI](https://github.com/8gvyzdywt4-art/dsh-screenshot/actions/workflows/ci.yml/badge.svg)](https://github.com/8gvyzdywt4-art/dsh-screenshot/actions/workflows/ci.yml)
+[![CI](https://github.com/snowl-code/dsh-screenshot/actions/workflows/ci.yml/badge.svg)](https://github.com/snowl-code/dsh-screenshot/actions/workflows/ci.yml)
 
 在 DSH 输入框左下工具条（`+` 旁边）加一个相机按钮：点一下就能框选屏幕区域，截图直接进当前草稿的附件栏，输完问题一起发出去。支持 macOS 与 Windows 桌面端。
 
 ## 安装
 
 ```bash
-git clone https://github.com/8gvyzdywt4-art/dsh-screenshot.git
+git clone https://github.com/snowl-code/dsh-screenshot.git
 ```
 
 在 DSH 里用插件管理器安装本地目录（`link:` 后面换成这个仓库的绝对路径）：
